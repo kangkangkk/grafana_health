@@ -10,6 +10,8 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-overflow-scrolling: touch;
+  touch-action: manipulation;
 }
 
 html {
@@ -19,6 +21,56 @@ html {
 body {
   background-color: #FFF8F0;
   color: #2D3436;
+}
+
+/* 防止 UI 元素文本被选中 */
+button,
+nav,
+[role="tab"],
+[role="navigation"] {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* iOS 安全区域 - 顶部 */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* iOS 安全区域 - 底部内容区 */
+.safe-area-bottom {
+  padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* iOS 安全区域 - 底部导航栏 */
+.safe-area-bottom-nav {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* 原生应用特定样式 */
+.native-app {
+  /* 原生端隐藏滚动条 */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.native-app::-webkit-scrollbar {
+  display: none;
+}
+
+/* PWA standalone 模式适配 */
+@media all and (display-mode: standalone) {
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .safe-area-bottom {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .safe-area-bottom-nav {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
 }
 
 /* Custom scrollbar */

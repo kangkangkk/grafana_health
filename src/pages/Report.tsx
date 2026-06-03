@@ -1,6 +1,8 @@
 import { useState, useRef } from 'react';
-import { Upload, Camera, FileText, AlertCircle, CheckCircle2, ChevronDown } from 'lucide-react';
+import { Upload, Camera, FileText, AlertCircle, CheckCircle2, ChevronDown, Image } from 'lucide-react';
 import type { OcrItem, ReportRecord } from '@/types';
+import { takePhoto, pickImage } from '@/plugins/camera';
+import { isNative } from '@/plugins/health';
 
 const mockOcrResult: OcrItem[] = [
   { name: '血红蛋白', value: '110', unit: 'g/L', referenceRange: '115-150', isAbnormal: true, interpretation: '略低于正常值，孕期轻度贫血较常见，建议补充铁质，多吃红肉、动物肝脏等含铁食物' },
@@ -36,6 +38,27 @@ export default function Report() {
     reader.readAsDataURL(f);
   };
 
+  const handleNativeImage = (dataUrl: string) => {
+    setPreview(dataUrl);
+    setFile(null);
+    setParsed(false);
+    setOcrResult([]);
+  };
+
+  const handleTakePhoto = async () => {
+    const result = await takePhoto();
+    if (result) {
+      handleNativeImage(result);
+    }
+  };
+
+  const handlePickImage = async () => {
+    const result = await pickImage();
+    if (result) {
+      handleNativeImage(result);
+    }
+  };
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     const f = e.dataTransfer.files[0];
@@ -43,16 +66,12 @@ export default function Report() {
   };
 
   const handleUpload = async () => {
-    if (!file) return;
+    if (!preview && !file) return;
     setUploading(true);
     await new Promise((r) => setTimeout(r, 2000));
     setOcrResult(mockOcrResult);
     setParsed(true);
     setUploading(false);
-  };
-
-  const handleCamera = () => {
-    fileInputRef.current?.click();
   };
 
   return (
@@ -75,7 +94,7 @@ export default function Report() {
         {preview ? (
           <div className="space-y-4">
             <img src={preview} alt="报告预览" className="mx-auto max-h-48 rounded-xl object-contain" />
-            <p className="text-sm text-gray-500">{file?.name}</p>
+            <p className="text-sm text-gray-500">{file?.name ?? '已选择图片'}</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -89,19 +108,40 @@ export default function Report() {
           </div>
         )}
         <div className="mt-4 flex items-center justify-center gap-3">
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="rounded-xl bg-coral-light/30 px-4 py-2 text-sm font-medium text-coral transition-all hover:bg-coral-light/50"
-          >
-            选择文件
-          </button>
-          <button
-            onClick={handleCamera}
-            className="flex items-center gap-1.5 rounded-xl bg-mint-light/30 px-4 py-2 text-sm font-medium text-mint transition-all hover:bg-mint-light/50"
-          >
-            <Camera className="h-4 w-4" />
-            拍照
-          </button>
+          {isNative ? (
+            <>
+              <button
+                onClick={handleTakePhoto}
+                className="flex items-center gap-1.5 rounded-xl bg-coral-light/30 px-4 py-2 text-sm font-medium text-coral transition-all hover:bg-coral-light/50"
+              >
+                <Camera className="h-4 w-4" />
+                拍照上传
+              </button>
+              <button
+                onClick={handlePickImage}
+                className="flex items-center gap-1.5 rounded-xl bg-mint-light/30 px-4 py-2 text-sm font-medium text-mint transition-all hover:bg-mint-light/50"
+              >
+                <Image className="h-4 w-4" />
+                从相册选择
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="rounded-xl bg-coral-light/30 px-4 py-2 text-sm font-medium text-coral transition-all hover:bg-coral-light/50"
+              >
+                选择文件
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-1.5 rounded-xl bg-mint-light/30 px-4 py-2 text-sm font-medium text-mint transition-all hover:bg-mint-light/50"
+              >
+                <Camera className="h-4 w-4" />
+                拍照
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -134,7 +174,7 @@ export default function Report() {
         </div>
         <button
           onClick={handleUpload}
-          disabled={!file || uploading}
+          disabled={(!file && !preview) || uploading}
           className="ml-auto rounded-2xl bg-gradient-to-r from-coral to-coral-light px-6 py-2 text-sm font-medium text-white shadow-md transition-all hover:shadow-lg disabled:opacity-50"
         >
           {uploading ? '解析中...' : '开始解析'}

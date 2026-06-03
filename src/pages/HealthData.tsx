@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useStore } from '@/store/useStore';
-import { Scale, Activity, Droplets, Thermometer, Heart, RefreshCw, Watch, Smartphone, CheckCircle2 } from 'lucide-react';
+import { Scale, Activity, Droplets, Thermometer, Heart, RefreshCw, Watch, Smartphone, CheckCircle2, ToggleLeft, ToggleRight } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { healthBridge, isNative, isIOS, isAndroid } from '@/plugins/health';
 
 type Tab = 'manual' | 'sync';
 type Range = 7 | 30 | 90;
@@ -40,6 +41,8 @@ export default function HealthData() {
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [syncing, setSyncing] = useState(false);
   const [syncDone, setSyncDone] = useState(false);
+  const [backgroundSync, setBackgroundSync] = useState(false);
+  const [healthAuthorized, setHealthAuthorized] = useState(false);
   const { addHealthRecord, syncDeviceData } = useStore();
 
   const handleInputChange = (key: string, value: string) => {
@@ -66,9 +69,57 @@ export default function HealthData() {
   const handleSync = async () => {
     setSyncing(true);
     setSyncDone(false);
-    await syncDeviceData('apple_watch', ['heart_rate', 'steps', 'sleep', 'blood_oxygen']);
+
+    if (isNative) {
+      // 原生端：先请求权限，再同步数据
+      const granted = await healthBridge.requestAuthorization();
+      setHealthAuthorized(granted);
+      if (granted) {
+        const now = new Date();
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        await healthBridge.fetchHealthData(
+          'heart_rate',
+          weekAgo.toISOString().split('T')[0],
+          now.toISOString().split('T')[0]
+        );
+      }
+    }
+
+    // 无论是原生还是 Web，都走 API 同步
+    await syncDeviceData(
+      isIOS ? 'apple_watch' : isAndroid ? 'google_fit' : 'apple_watch',
+      ['heart_rate', 'steps', 'sleep', 'blood_oxygen']
+    );
+
     setSyncing(false);
     setSyncDone(true);
+  };
+
+  const handleToggleBackgroundSync = async () => {
+    if (backgroundSync) {
+      await healthBridge.stopBackgroundSync();
+      setBackgroundSync(false);
+    } else {
+      if (isNative && !healthAuthorized) {
+        const granted = await healthBridge.requestAuthorization();
+        setHealthAuthorized(granted);
+        if (!granted) return;
+      }
+      await healthBridge.startBackgroundSync();
+      setBackgroundSync(true);
+    }
+  };
+
+  const getSyncDeviceName = () => {
+    if (isIOS) return 'Apple Watch';
+    if (isAndroid) return 'Google Fit';
+    return 'Apple Watch';
+  };
+
+  const getSyncPhoneName = () => {
+    if (isIOS) return 'iPhone 健康数据';
+    if (isAndroid) return 'Android 健康数据';
+    return 'iPhone 健康数据';
   };
 
   const trendData = generateTrendData(
@@ -138,7 +189,7 @@ export default function HealthData() {
                 <Watch className="h-6 w-6 text-coral" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium text-dark">Apple Watch</p>
+                <p className="text-sm font-medium text-dark">{getSyncDeviceName()}</p>
                 <p className="text-xs text-gray-400">上次同步: 今天 08:30</p>
               </div>
               <CheckCircle2 className="h-5 w-5 text-mint" />
@@ -148,7 +199,7 @@ export default function HealthData() {
                 <Smartphone className="h-6 w-6 text-mint" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium text-dark">iPhone 健康数据</p>
+                <p className="text-sm font-medium text-dark">{getSyncPhoneName()}</p>
                 <p className="text-xs text-gray-400">上次同步: 今天 09:15</p>
               </div>
               <CheckCircle2 className="h-5 w-5 text-mint" />
@@ -160,8 +211,28 @@ export default function HealthData() {
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-mint to-mint-light py-3 text-sm font-medium text-white shadow-md transition-all hover:shadow-lg disabled:opacity-60"
           >
             <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-            {syncing ? '同步中...' : syncDone ? '同步完成 ✓' : '立即同步'}
+            {syncing ? '同步中...' : syncDone ? '同步完成 ✓' : '同步数据'}
           </button>
+
+          {/* 后台同步开关 - 仅原生端显示 */}
+          {isNative && (
+            <div className="mt-4 flex items-center justify-between rounded-xl border border-gray-100 p-4">
+              <div>
+                <p className="text-sm font-medium text-dark">开启后台同步</p>
+                <p className="text-xs text-gray-400">自动从{getSyncDeviceName()}同步健康数据</p>
+              </div>
+              <button
+                onClick={handleToggleBackgroundSync}
+                className="flex items-center"
+              >
+                {backgroundSync ? (
+                  <ToggleRight className="h-8 w-8 text-mint" />
+                ) : (
+                  <ToggleLeft className="h-8 w-8 text-gray-300" />
+                )}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

@@ -3,6 +3,8 @@ import { Heart, Footprints, Moon, Droplets, Scale, Activity, Apple, Dumbbell, St
 import { useStore } from '@/store/useStore';
 import HealthCard from '@/components/HealthCard';
 import WeekProgress from '@/components/WeekProgress';
+import { isNative } from '@/plugins/health';
+import { requestNotificationPermission, scheduleDailyReminder } from '@/plugins/notifications';
 
 const reminders = [
   { icon: Apple, label: '饮食提醒', desc: '今天记得补充叶酸和铁质', color: 'text-coral', bg: 'bg-coral/10' },
@@ -17,6 +19,36 @@ export default function Dashboard() {
     fetchPregnancyInfo();
     fetchHealthRecords();
   }, [fetchPregnancyInfo, fetchHealthRecords]);
+
+  useEffect(() => {
+    if (!isNative) return;
+
+    const setupNotifications = async () => {
+      const granted = await requestNotificationPermission();
+      if (!granted) return;
+
+      const week = pregnancyInfo?.currentWeek ?? 20;
+
+      // 根据孕周安排每日提醒
+      await scheduleDailyReminder(
+        '饮食提醒',
+        week < 12 ? '记得补充叶酸，少食多餐缓解孕吐' :
+        week < 28 ? '增加蛋白质和铁质摄入，多吃蔬果' :
+        '补充钙质和能量，选择易消化食物',
+        8, 0
+      );
+
+      await scheduleDailyReminder(
+        '运动建议',
+        week < 12 ? '建议轻度散步，避免剧烈运动' :
+        week < 28 ? '可以尝试孕妇瑜伽和游泳，每次30分钟' :
+        '轻度散步和呼吸练习，注意休息',
+        17, 0
+      );
+    };
+
+    setupNotifications();
+  }, [pregnancyInfo?.currentWeek]);
 
   const getRecord = (type: string) => healthRecords.find((r) => r.type === type);
 
