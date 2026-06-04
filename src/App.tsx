@@ -5,6 +5,7 @@ import HealthData from "@/pages/HealthData";
 import Pregnancy from "@/pages/Pregnancy";
 import Report from "@/pages/Report";
 import Archive from "@/pages/Archive";
+import InstallPrompt from "@/components/InstallPrompt";
 import { isNative } from "@/plugins/health";
 import { App as CapacitorApp } from "@capacitor/app";
 
@@ -38,6 +39,7 @@ export default function App() {
           <Route path="/archive" element={<Archive />} />
         </Route>
       </Routes>
+      <InstallPrompt />
     </Router>
   );
 }

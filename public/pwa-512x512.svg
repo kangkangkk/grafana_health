@@ -1,0 +1,7 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="96" fill="#F4845F"/>
+  <circle cx="256" cy="220" r="100" fill="#FFF8F0" opacity="0.9"/>
+  <path d="M256 160 C256 160 220 190 220 220 C220 240 236 260 256 260 C276 260 292 240 292 220 C292 190 256 160 256 160Z" fill="#7EC8A4"/>
+  <path d="M256 180 C256 180 240 200 240 220 C240 232 247 244 256 244 C265 244 272 232 272 220 C272 200 256 180 256 180Z" fill="#FFF8F0"/>
+  <text x="256" y="380" text-anchor="middle" font-family="sans-serif" font-size="72" font-weight="700" fill="#FFF8F0">孕婴守护</text>
+</svg>
