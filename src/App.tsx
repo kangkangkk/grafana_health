@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Layout from "@/components/Layout";
 import Dashboard from "@/pages/Dashboard";
@@ -7,26 +8,32 @@ import Report from "@/pages/Report";
 import Archive from "@/pages/Archive";
 import InstallPrompt from "@/components/InstallPrompt";
 import { isNative } from "@/plugins/health";
-import { App as CapacitorApp } from "@capacitor/app";
+import { App as CapacitorApp, AppState } from "@capacitor/app";
 
 export default function App() {
-  // 原生端应用生命周期处理
-  if (isNative) {
-    CapacitorApp.addListener('appStateChange', (state) => {
+  useEffect(() => {
+    if (!isNative) return;
+
+    const listeners: Array<() => void> = [];
+
+    // 应用生命周期处理
+    CapacitorApp.addListener('appStateChange', (state: AppState) => {
       if (!state.isActive) {
-        // 应用进入后台
         console.log('App paused');
       } else {
-        // 应用恢复前台
         console.log('App resumed');
       }
-    });
+    }).then(l => listeners.push(() => l.remove()));
 
     // 深度链接处理
     CapacitorApp.addListener('appUrlOpen', (data) => {
       console.log('Deep link opened:', data.url);
-    });
-  }
+    }).then(l => listeners.push(() => l.remove()));
+
+    return () => {
+      listeners.forEach(remove => remove());
+    };
+  }, []);
 
   return (
     <Router>

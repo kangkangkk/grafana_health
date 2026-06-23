@@ -34,6 +34,16 @@ export default function Layout() {
     setupNative();
   }, []);
 
+  // Escape 键关闭移动端菜单
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileMenuOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mobileMenuOpen]);
+
   // Tab 切换时触觉反馈
   const handleTabClick = async () => {
     if (!isNative) return;
@@ -93,6 +103,8 @@ export default function Layout() {
         {!isNative && (
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="打开菜单"
+            aria-expanded={mobileMenuOpen}
             className="rounded-xl p-2 text-gray-600 hover:bg-gray-100"
           >
             {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -103,6 +115,9 @@ export default function Layout() {
       {/* Mobile Menu Overlay - 仅 Web 端显示 */}
       {!isNative && mobileMenuOpen && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="导航菜单"
           className="fixed inset-0 z-30 bg-black/30 lg:hidden"
           onClick={() => setMobileMenuOpen(false)}
         />
@@ -163,6 +178,8 @@ export default function Layout() {
               to={item.to}
               end={item.to === '/'}
               onClick={handleTabClick}
+              aria-label={item.label}
+              aria-current="page"
               className={({ isActive }) =>
                 `flex flex-col items-center gap-0.5 px-2 py-1 text-xs transition-colors ${
                   isActive ? 'text-coral' : 'text-gray-400'

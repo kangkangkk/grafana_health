@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '@/store/useStore';
-import { FileText, Activity, Calendar, Download, Filter, Heart, Scale, Droplets, Thermometer } from 'lucide-react';
-import type { HealthRecord } from '@/types';
+import { FileText, Activity, Calendar, Download, Filter, Heart, Scale, Droplets, Thermometer, AlertCircle } from 'lucide-react';
 
 type FilterType = 'all' | 'heart_rate' | 'weight' | 'blood_sugar' | 'temperature' | 'blood_pressure';
 
@@ -13,18 +12,8 @@ const typeLabels: Record<string, { label: string; icon: typeof Heart; unit: stri
   blood_pressure: { label: '血压', icon: Activity, unit: 'mmHg' },
 };
 
-const mockRecords: HealthRecord[] = [
-  { id: '1', userId: 'user-1', type: 'heart_rate', value: 78, unit: 'bpm', recordedAt: '2025-06-01T08:00:00Z', source: 'apple_watch', createdAt: '2025-06-01T08:00:00Z' },
-  { id: '2', userId: 'user-1', type: 'weight', value: 62.5, unit: 'kg', recordedAt: '2025-06-01T07:30:00Z', source: 'manual', createdAt: '2025-06-01T07:30:00Z' },
-  { id: '3', userId: 'user-1', type: 'blood_sugar', value: 5.2, unit: 'mmol/L', recordedAt: '2025-05-31T07:00:00Z', source: 'manual', createdAt: '2025-05-31T07:00:00Z' },
-  { id: '4', userId: 'user-1', type: 'temperature', value: 36.5, unit: '°C', recordedAt: '2025-05-30T07:00:00Z', source: 'manual', createdAt: '2025-05-30T07:00:00Z' },
-  { id: '5', userId: 'user-1', type: 'blood_pressure', value: 118, unit: 'mmHg', recordedAt: '2025-05-29T09:00:00Z', source: 'manual', createdAt: '2025-05-29T09:00:00Z' },
-  { id: '6', userId: 'user-1', type: 'heart_rate', value: 82, unit: 'bpm', recordedAt: '2025-05-28T08:30:00Z', source: 'apple_watch', createdAt: '2025-05-28T08:30:00Z' },
-  { id: '7', userId: 'user-1', type: 'weight', value: 62.2, unit: 'kg', recordedAt: '2025-05-27T07:30:00Z', source: 'manual', createdAt: '2025-05-27T07:30:00Z' },
-];
-
 export default function Archive() {
-  const { healthRecords, reports, fetchHealthRecords, fetchReports } = useStore();
+  const { healthRecords, reports, pregnancyInfo, fetchHealthRecords, fetchReports, error } = useStore();
   const [filterType, setFilterType] = useState<FilterType>('all');
   const [dateRange, setDateRange] = useState<'7' | '30' | 'all'>('30');
 
@@ -33,12 +22,14 @@ export default function Archive() {
     fetchReports();
   }, [fetchHealthRecords, fetchReports]);
 
-  const allRecords = healthRecords.length > 0 ? healthRecords : mockRecords;
-  const totalRecords = allRecords.length;
+  const totalRecords = healthRecords.length;
   const reportsCount = reports.length;
-  const trackingDays = Math.max(1, Math.ceil((Date.now() - new Date('2025-03-01').getTime()) / (1000 * 60 * 60 * 24)));
+  // 使用孕期信息计算追踪天数，而非硬编码日期
+  const trackingDays = pregnancyInfo
+    ? Math.max(1, Math.ceil((Date.now() - new Date(pregnancyInfo.lastPeriodDate).getTime()) / (1000 * 60 * 60 * 24)))
+    : 1;
 
-  const filteredRecords = allRecords.filter((r) => {
+  const filteredRecords = healthRecords.filter((r) => {
     if (filterType !== 'all' && r.type !== filterType) return false;
     if (dateRange !== 'all') {
       const days = parseInt(dateRange);
@@ -54,39 +45,32 @@ export default function Archive() {
     <div className="animate-fade-in space-y-6">
       <h2 className="font-display text-2xl font-bold text-dark">健康档案</h2>
 
+      {/* Error State */}
+      {error && (
+        <div className="flex items-center gap-2 rounded-2xl bg-red-50 border border-red-100 p-4">
+          <AlertCircle className="h-5 w-5 text-red-500 shrink-0" />
+          <p className="text-sm text-red-600">{error}</p>
+        </div>
+      )}
+
       {/* Summary Cards */}
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-2xl bg-gradient-to-br from-coral/10 to-coral-light/20 p-5 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-coral/20 text-coral">
-              <Activity className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-dark">{totalRecords}</p>
-              <p className="text-xs text-gray-500">总记录数</p>
-            </div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-coral/20 text-coral"><Activity className="h-5 w-5" /></div>
+            <div><p className="text-2xl font-bold text-dark">{totalRecords}</p><p className="text-xs text-gray-500">总记录数</p></div>
           </div>
         </div>
         <div className="rounded-2xl bg-gradient-to-br from-mint/10 to-mint-light/20 p-5 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-mint/20 text-mint">
-              <FileText className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-dark">{reportsCount}</p>
-              <p className="text-xs text-gray-500">报告数量</p>
-            </div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-mint/20 text-mint"><FileText className="h-5 w-5" /></div>
+            <div><p className="text-2xl font-bold text-dark">{reportsCount}</p><p className="text-xs text-gray-500">报告数量</p></div>
           </div>
         </div>
         <div className="rounded-2xl bg-gradient-to-br from-purple-50 to-purple-100 p-5 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100 text-purple-500">
-              <Calendar className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-dark">{trackingDays}</p>
-              <p className="text-xs text-gray-500">追踪天数</p>
-            </div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100 text-purple-500"><Calendar className="h-5 w-5" /></div>
+            <div><p className="text-2xl font-bold text-dark">{trackingDays}</p><p className="text-xs text-gray-500">追踪天数</p></div>
           </div>
         </div>
       </div>
@@ -96,28 +80,12 @@ export default function Archive() {
         <div className="flex items-center gap-1.5 rounded-xl bg-white p-1 shadow-sm">
           <Filter className="h-4 w-4 text-gray-400 ml-2" />
           {(['all', 'heart_rate', 'weight', 'blood_sugar', 'temperature', 'blood_pressure'] as FilterType[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => setFilterType(t)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                filterType === t ? 'bg-coral text-white' : 'text-gray-500 hover:text-coral'
-              }`}
-            >
-              {t === 'all' ? '全部' : typeLabels[t]?.label ?? t}
-            </button>
+            <button key={t} onClick={() => setFilterType(t)} className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${filterType === t ? 'bg-coral text-white' : 'text-gray-500 hover:text-coral'}`}>{t === 'all' ? '全部' : typeLabels[t]?.label ?? t}</button>
           ))}
         </div>
         <div className="flex gap-1 rounded-xl bg-white p-1 shadow-sm">
           {(['7', '30', 'all'] as const).map((d) => (
-            <button
-              key={d}
-              onClick={() => setDateRange(d)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                dateRange === d ? 'bg-mint text-white' : 'text-gray-500 hover:text-mint'
-              }`}
-            >
-              {d === 'all' ? '全部' : `${d}天`}
-            </button>
+            <button key={d} onClick={() => setDateRange(d)} className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${dateRange === d ? 'bg-mint text-white' : 'text-gray-500 hover:text-mint'}`}>{d === 'all' ? '全部' : `${d}天`}</button>
           ))}
         </div>
       </div>
@@ -150,7 +118,7 @@ export default function Archive() {
                 </tr>
               );
             }) : (
-              <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-400">暂无数据</td></tr>
+              <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-400">暂无数据，去录入健康数据吧</td></tr>
             )}
           </tbody>
         </table>
@@ -163,12 +131,10 @@ export default function Archive() {
           <div className="space-y-3">
             {reports.map((r) => (
               <div key={r.id} className="flex items-center gap-4 rounded-2xl bg-white p-4 shadow-sm">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-coral/10">
-                  <FileText className="h-5 w-5 text-coral" />
-                </div>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-coral/10"><FileText className="h-5 w-5 text-coral" /></div>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-dark">{r.reportType}</p>
-                  <p className="text-xs text-gray-400">孕{r.pregnancyWeek}周 · {new Date(r.parsedAt).toLocaleDateString('zh-CN')}</p>
+                  <p className="text-xs text-gray-400">孕{r.pregnancyWeek}周 · {new Date(r.parsedAt || r.createdAt).toLocaleDateString('zh-CN')}</p>
                 </div>
               </div>
             ))}

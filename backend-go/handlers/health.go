@@ -114,6 +114,21 @@ func CreateHealthRecord(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid type. Valid types: %v", validTypes))
 		return
 	}
+	// Validate value range based on type
+	if req.Value < 0 {
+		writeError(w, http.StatusBadRequest, "Value cannot be negative")
+		return
+	}
+	// Reasonable upper bounds per type
+	maxValues := map[string]float64{
+		"heart_rate": 250, "steps": 100000, "sleep": 24,
+		"blood_oxygen": 100, "weight": 500, "blood_pressure": 300,
+		"blood_sugar": 50, "temperature": 50,
+	}
+	if maxVal, ok := maxValues[req.Type]; ok && req.Value > maxVal {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("Value %.2f exceeds maximum allowed %.2f for type %s", req.Value, maxVal, req.Type))
+		return
+	}
 	if req.RecordedAt == "" {
 		writeError(w, http.StatusBadRequest, "recordedAt is required")
 		return

@@ -10,6 +10,8 @@ import (
 	"time"
 
 	_ "modernc.org/sqlite"
+
+	"github.com/google/uuid"
 )
 
 var DB *sql.DB
@@ -26,6 +28,10 @@ func InitDB(dbPath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
+
+	DB.SetMaxOpenConns(25)
+	DB.SetMaxIdleConns(5)
+	DB.SetConnMaxLifetime(5 * time.Minute)
 
 	// Enable WAL mode and foreign keys
 	if _, err := DB.Exec("PRAGMA journal_mode=WAL"); err != nil {
@@ -180,7 +186,7 @@ func insertDemoData() error {
 			minute := r.Intn(60)
 			recordedAt := fmt.Sprintf("%sT%02d:%02d:00", dateStr, hour, minute)
 
-			id := generateUUID()
+			id := uuid.New().String()
 			source := sources[r.Intn(len(sources))]
 
 			_, err := stmt.Exec(id, "demo-user-001", ht.typeName, value, ht.unit, recordedAt, source)
@@ -192,18 +198,6 @@ func insertDemoData() error {
 	}
 
 	return tx.Commit()
-}
-
-// generateUUID generates a UUID v4 without external dependency
-func generateUUID() string {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return fmt.Sprintf("%08x-%04x-4%03x-%04x-%012x",
-		r.Uint32(),
-		r.Uint32()&0xffff,
-		r.Uint32()&0xfff,
-		(r.Uint32()&0x3fff)|0x8000,
-		r.Uint64()&0xffffffffffff,
-	)
 }
 
 // CloseDB closes the database connection

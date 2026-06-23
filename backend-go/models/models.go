@@ -6,29 +6,29 @@ type User struct {
 	Phone     string `json:"phone"`
 	Email     string `json:"email"`
 	Avatar    string `json:"avatar"`
-	CreatedAt string `json:"created_at"`
+	CreatedAt string `json:"createdAt"`
 }
 
 type HealthRecord struct {
 	ID         string  `json:"id"`
-	UserID     string  `json:"user_id"`
+	UserID     string  `json:"userId"`
 	Type       string  `json:"type"`
 	Value      float64 `json:"value"`
 	Unit       string  `json:"unit"`
-	RecordedAt string  `json:"recorded_at"`
+	RecordedAt string  `json:"recordedAt"`
 	Source     string  `json:"source"`
-	CreatedAt  string  `json:"created_at"`
+	CreatedAt  string  `json:"createdAt"`
 }
 
 type PregnancyInfo struct {
 	ID             string `json:"id"`
-	UserID         string `json:"user_id"`
-	DueDate        string `json:"due_date"`
-	LastPeriodDate string `json:"last_period_date"`
-	CurrentWeek    int    `json:"current_week"`
-	CurrentDay     int    `json:"current_day"`
-	CreatedAt      string `json:"created_at"`
-	UpdatedAt      string `json:"updated_at"`
+	UserID         string `json:"userId"`
+	DueDate        string `json:"dueDate"`
+	LastPeriodDate string `json:"lastPeriodDate"`
+	CurrentWeek    int    `json:"currentWeek"`
+	CurrentDay     int    `json:"currentDay"`
+	CreatedAt      string `json:"createdAt"`
+	UpdatedAt      string `json:"updatedAt"`
 }
 
 type WeekInfo struct {
@@ -56,13 +56,13 @@ type OcrItem struct {
 
 type ReportRecord struct {
 	ID            string    `json:"id"`
-	UserID        string    `json:"user_id"`
-	PregnancyWeek int       `json:"pregnancy_week"`
-	ReportType    string    `json:"report_type"`
-	ImageURL      string    `json:"image_url"`
-	OcrResult     []OcrItem `json:"ocr_result"`
-	ParsedAt      string    `json:"parsed_at"`
-	CreatedAt     string    `json:"created_at"`
+	UserID        string    `json:"userId"`
+	PregnancyWeek int       `json:"pregnancyWeek"`
+	ReportType    string    `json:"reportType"`
+	ImageURL      string    `json:"imageUrl"`
+	OcrResult     []OcrItem `json:"ocrResult"`
+	ParsedAt      string    `json:"parsedAt"`
+	CreatedAt     string    `json:"createdAt"`
 }
 
 type CheckupItem struct {

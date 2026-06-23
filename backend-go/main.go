@@ -1,9 +1,14 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"strings"
+	"syscall"
+	"time"
 
 	"health-platform/database"
 	"health-platform/handlers"
@@ -23,7 +28,6 @@ func main() {
 	if err := database.InitDB(dbPath); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
-	defer database.CloseDB()
 
 	log.Println("Database initialized successfully")
 
@@ -34,17 +38,24 @@ func main() {
 	r.Use(chimw.Logger)
 	r.Use(chimw.Recoverer)
 
-	// CORS - allow all origins for development
+	// CORS - read allowed origins from env, default to localhost dev origins
+	allowedOrigins := []string{"http://localhost:5173", "http://localhost:4173", "http://localhost:3000"}
+	if envOrigins := os.Getenv("CORS_ALLOWED_ORIGINS"); envOrigins != "" {
+		allowedOrigins = strings.Split(envOrigins, ",")
+	}
 	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{"*"},
+		AllowedOrigins:   allowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"*"},
+		AllowedHeaders:   []string{"Content-Type", "Authorization"},
 		AllowCredentials: true,
 	})
 	r.Use(c.Handler)
 
-	// Serve uploaded files
-	r.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads"))))
+	// Serve uploaded files with Content-Disposition to prevent inline display
+	r.Handle("/uploads/*", http.StripPrefix("/uploads/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Disposition", "attachment")
+		http.FileServer(http.Dir("./uploads")).ServeHTTP(w, r)
+	})))
 
 	// API routes
 	r.Route("/api", func(r chi.Router) {
@@ -73,14 +84,33 @@ func main() {
 		})
 	})
 
-	// Start server
+	// Graceful shutdown
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3001"
 	}
 
-	log.Printf("Server starting on port %s...", port)
-	if err := http.ListenAndServe(":"+port, r); err != nil {
-		log.Fatalf("Server failed: %v", err)
+	srv := &http.Server{Addr: ":" + port, Handler: r}
+
+	go func() {
+		log.Printf("Server starting on port %s...", port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Server failed: %v", err)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Println("Shutting down server...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Printf("Server forced shutdown: %v", err)
 	}
+
+	log.Println("Closing database...")
+	database.CloseDB()
+	log.Println("Server exited")
 }

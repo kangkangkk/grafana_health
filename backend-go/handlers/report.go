@@ -193,11 +193,22 @@ func UploadReport(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// Check content type
-	contentType := header.Header.Get("Content-Type")
-	if !allowedImageTypes[contentType] {
-		writeError(w, http.StatusBadRequest, "Only image files are allowed")
+	// Read first 512 bytes to detect real content type
+	headBytes := make([]byte, 512)
+	n, err := io.ReadFull(file, headBytes)
+	if err != nil && err != io.ErrUnexpectedEOF && err != io.EOF {
+		writeError(w, http.StatusInternalServerError, "Failed to read file")
 		return
+	}
+	detectedType := http.DetectContentType(headBytes[:n])
+	if !allowedImageTypes[detectedType] {
+		writeError(w, http.StatusBadRequest, "Only image files are allowed (detected: "+detectedType+")")
+		return
+	}
+
+	// Seek back to start for copying
+	if seeker, ok := file.(io.Seeker); ok {
+		seeker.Seek(0, io.SeekStart)
 	}
 
 	// Ensure uploads directory exists

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -25,24 +25,36 @@ const iconBg = {
   purple: 'bg-purple-100 text-purple-500',
 };
 
-export default function HealthCard({ icon: Icon, label, value, unit, trend = 'stable', type = 'coral' }: HealthCardProps) {
+function HealthCardBase({ icon: Icon, label, value, unit, trend = 'stable', type = 'coral' }: HealthCardProps) {
   const [displayValue, setDisplayValue] = useState(0);
+  const rafRef = useRef<number>();
 
   useEffect(() => {
+    if (value === 0) {
+      setDisplayValue(0);
+      return;
+    }
     const duration = 800;
-    const steps = 30;
-    const increment = value / steps;
-    let current = 0;
-    const timer = setInterval(() => {
-      current += increment;
-      if (current >= value) {
-        setDisplayValue(value);
-        clearInterval(timer);
+    const startTime = performance.now();
+    const startValue = 0;
+
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // easeOutCubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = startValue + (value - startValue) * eased;
+      setDisplayValue(Math.round(current * 10) / 10);
+
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(animate);
       } else {
-        setDisplayValue(Math.round(current * 10) / 10);
+        setDisplayValue(value);
       }
-    }, duration / steps);
-    return () => clearInterval(timer);
+    };
+
+    rafRef.current = requestAnimationFrame(animate);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
   }, [value]);
 
   const TrendIcon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : Minus;
@@ -51,12 +63,8 @@ export default function HealthCard({ icon: Icon, label, value, unit, trend = 'st
   return (
     <div className={`animate-slide-up rounded-2xl bg-gradient-to-br ${gradients[type]} p-4 shadow-sm transition-all duration-300 hover:shadow-md`}>
       <div className="flex items-center justify-between">
-        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${iconBg[type]}`}>
-          <Icon className="h-5 w-5" />
-        </div>
-        <div className={`flex items-center gap-1 ${trendColor}`}>
-          <TrendIcon className="h-4 w-4" />
-        </div>
+        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${iconBg[type]}`}><Icon className="h-5 w-5" /></div>
+        <div className={`flex items-center gap-1 ${trendColor}`}><TrendIcon className="h-4 w-4" /></div>
       </div>
       <div className="mt-3">
         <p className="text-xs text-gray-500">{label}</p>
@@ -68,3 +76,5 @@ export default function HealthCard({ icon: Icon, label, value, unit, trend = 'st
     </div>
   );
 }
+
+export default memo(HealthCardBase);

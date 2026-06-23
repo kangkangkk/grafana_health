@@ -1,22 +1,11 @@
-import { useState, useRef } from 'react';
-import { Upload, Camera, FileText, AlertCircle, CheckCircle2, ChevronDown, Image } from 'lucide-react';
-import type { OcrItem, ReportRecord } from '@/types';
+import { useState, useRef, useEffect } from 'react';
+import { Upload, Camera, FileText, AlertCircle, CheckCircle2, ChevronDown, Image as ImageIcon, X } from 'lucide-react';
+import type { OcrItem } from '@/types';
 import { takePhoto, pickImage } from '@/plugins/camera';
 import { isNative } from '@/plugins/health';
+import { useStore } from '@/store/useStore';
 
-const mockOcrResult: OcrItem[] = [
-  { name: '血红蛋白', value: '110', unit: 'g/L', referenceRange: '115-150', isAbnormal: true, interpretation: '略低于正常值，孕期轻度贫血较常见，建议补充铁质，多吃红肉、动物肝脏等含铁食物' },
-  { name: '白细胞', value: '8.5', unit: '×10⁹/L', referenceRange: '3.5-9.5', isAbnormal: false, interpretation: '正常范围内，孕期白细胞轻度升高属正常现象' },
-  { name: '血小板', value: '180', unit: '×10⁹/L', referenceRange: '125-350', isAbnormal: false, interpretation: '正常范围内' },
-  { name: '空腹血糖', value: '5.8', unit: 'mmol/L', referenceRange: '3.9-5.1', isAbnormal: true, interpretation: '高于正常值，需警惕妊娠期糖尿病，建议控制糖分摄入，定期监测血糖' },
-  { name: '总蛋白', value: '65', unit: 'g/L', referenceRange: '60-80', isAbnormal: false, interpretation: '正常范围内' },
-  { name: '谷丙转氨酶', value: '22', unit: 'U/L', referenceRange: '0-40', isAbnormal: false, interpretation: '正常范围内，肝功能良好' },
-];
-
-const mockHistory: ReportRecord[] = [
-  { id: '1', userId: 'user-1', pregnancyWeek: 16, reportType: '血常规', imageUrl: '', ocrResult: [], parsedAt: '2025-05-10T10:00:00Z', createdAt: '2025-05-10T10:00:00Z' },
-  { id: '2', userId: 'user-1', pregnancyWeek: 12, reportType: '尿常规', imageUrl: '', ocrResult: [], parsedAt: '2025-04-15T10:00:00Z', createdAt: '2025-04-15T10:00:00Z' },
-];
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 export default function Report() {
   const [file, setFile] = useState<File | null>(null);
@@ -25,11 +14,30 @@ export default function Report() {
   const [weekOpen, setWeekOpen] = useState(false);
   const [parsed, setParsed] = useState(false);
   const [ocrResult, setOcrResult] = useState<OcrItem[]>([]);
-  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (f: File | undefined) => {
+  const { uploadReport, reports, fetchReports, loading } = useStore();
+
+  useEffect(() => {
+    fetchReports();
+  }, [fetchReports]);
+
+  const validateAndSetFile = (f: File | undefined) => {
     if (!f) return;
+    setUploadError(null);
+
+    // 文件大小校验
+    if (f.size > MAX_FILE_SIZE) {
+      setUploadError('文件大小不能超过 10MB');
+      return;
+    }
+    // 文件类型校验
+    if (!f.type.startsWith('image/')) {
+      setUploadError('仅支持图片文件（JPG、PNG 等）');
+      return;
+    }
+
     setFile(f);
     setParsed(false);
     setOcrResult([]);
@@ -39,6 +47,7 @@ export default function Report() {
   };
 
   const handleNativeImage = (dataUrl: string) => {
+    setUploadError(null);
     setPreview(dataUrl);
     setFile(null);
     setParsed(false);
@@ -47,36 +56,52 @@ export default function Report() {
 
   const handleTakePhoto = async () => {
     const result = await takePhoto();
-    if (result) {
-      handleNativeImage(result);
-    }
+    if (result) handleNativeImage(result);
   };
 
   const handlePickImage = async () => {
     const result = await pickImage();
-    if (result) {
-      handleNativeImage(result);
-    }
+    if (result) handleNativeImage(result);
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    const f = e.dataTransfer.files[0];
-    handleFileChange(f);
+    validateAndSetFile(e.dataTransfer.files[0]);
   };
+
+  const [uploadingState, setUploadingState] = useState(false);
 
   const handleUpload = async () => {
     if (!preview && !file) return;
-    setUploading(true);
-    await new Promise((r) => setTimeout(r, 2000));
-    setOcrResult(mockOcrResult);
-    setParsed(true);
-    setUploading(false);
+    setUploadError(null);
+    setUploadingState(true);
+    try {
+      const report = await uploadReport(file ?? preview!, week);
+      setOcrResult(report.ocrResult ?? []);
+      setParsed(true);
+      setFile(null);
+      setPreview(null);
+    } catch (e) {
+      setUploadError((e as Error).message);
+    } finally {
+      setUploadingState(false);
+    }
   };
 
   return (
     <div className="animate-fade-in space-y-6">
       <h2 className="font-display text-2xl font-bold text-dark">报告解析</h2>
+
+      {/* Error Display */}
+      {uploadError && (
+        <div className="flex items-center gap-2 rounded-2xl bg-red-50 border border-red-100 p-4">
+          <AlertCircle className="h-5 w-5 text-red-500 shrink-0" />
+          <p className="text-sm text-red-600">{uploadError}</p>
+          <button onClick={() => setUploadError(null)} className="ml-auto text-red-400 hover:text-red-600">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Upload Area */}
       <div
@@ -89,7 +114,7 @@ export default function Report() {
           type="file"
           accept="image/*"
           className="hidden"
-          onChange={(e) => handleFileChange(e.target.files?.[0])}
+          onChange={(e) => validateAndSetFile(e.target.files?.[0])}
         />
         {preview ? (
           <div className="space-y-4">
@@ -103,7 +128,7 @@ export default function Report() {
             </div>
             <div>
               <p className="text-sm font-medium text-dark">点击上传或拖拽报告图片</p>
-              <p className="mt-1 text-xs text-gray-400">支持 JPG、PNG 格式</p>
+              <p className="mt-1 text-xs text-gray-400">支持 JPG、PNG 格式，最大 10MB</p>
             </div>
           </div>
         )}
@@ -121,7 +146,7 @@ export default function Report() {
                 onClick={handlePickImage}
                 className="flex items-center gap-1.5 rounded-xl bg-mint-light/30 px-4 py-2 text-sm font-medium text-mint transition-all hover:bg-mint-light/50"
               >
-                <Image className="h-4 w-4" />
+                <ImageIcon className="h-4 w-4" />
                 从相册选择
               </button>
             </>
@@ -174,10 +199,10 @@ export default function Report() {
         </div>
         <button
           onClick={handleUpload}
-          disabled={(!file && !preview) || uploading}
+          disabled={(!file && !preview) || uploadingState || loading}
           className="ml-auto rounded-2xl bg-gradient-to-r from-coral to-coral-light px-6 py-2 text-sm font-medium text-white shadow-md transition-all hover:shadow-lg disabled:opacity-50"
         >
-          {uploading ? '解析中...' : '开始解析'}
+          {uploadingState || loading ? '解析中...' : '开始解析'}
         </button>
       </div>
 
@@ -235,16 +260,16 @@ export default function Report() {
       {/* History Reports */}
       <div>
         <h3 className="mb-3 text-lg font-semibold text-dark">历史报告</h3>
-        {mockHistory.length > 0 ? (
+        {reports.length > 0 ? (
           <div className="space-y-3">
-            {mockHistory.map((r) => (
+            {reports.map((r) => (
               <div key={r.id} className="flex items-center gap-4 rounded-2xl bg-white p-4 shadow-sm transition-all hover:shadow-md">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-coral/10">
                   <FileText className="h-6 w-6 text-coral" />
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-dark">{r.reportType}</p>
-                  <p className="text-xs text-gray-400">孕{r.pregnancyWeek}周 · {new Date(r.parsedAt).toLocaleDateString('zh-CN')}</p>
+                  <p className="text-xs text-gray-400">孕{r.pregnancyWeek}周 · {new Date(r.parsedAt || r.createdAt).toLocaleDateString('zh-CN')}</p>
                 </div>
                 <button className="rounded-xl bg-coral-light/20 px-3 py-1.5 text-xs font-medium text-coral hover:bg-coral-light/40">
                   查看详情
@@ -253,7 +278,10 @@ export default function Report() {
             ))}
           </div>
         ) : (
-          <p className="text-center text-sm text-gray-400">暂无历史报告</p>
+          <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
+            <FileText className="mx-auto h-10 w-10 text-gray-300" />
+            <p className="mt-2 text-sm text-gray-400">暂无历史报告</p>
+          </div>
         )}
       </div>
     </div>
